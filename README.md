@@ -1,8 +1,8 @@
 # 🍮 CashFlow - Sistema de Gestão Financeira
 
-Este repositório centraliza toda a engenharia, documentação e código-fonte do sistema **CashFlow**, projetado especificamente para modernizar e escalar a gestão financeira das operações do **Pudim do Will** e da linha **Will Fit Food**.
+Este repositório centraliza toda a engenharia, documentação e código-fonte do sistema **CashFlow**, projetado especificamente para modernizar e escalar a gestão financeira das operações de uma empresa.
 
-A solução visa proporcionar um controlo absoluto e em tempo real sobre as entradas (vendas de sobremesas, refeições preparadas e parcerias via iFood) e saídas (compras de insumos, embalagens e custos operacionais), substituindo o esforço manual por um ecossistema tecnológico de alta performance.
+A solução visa proporcionar um controlo absoluto e em tempo real sobre as entradas  e saídas, substituindo o esforço manual por um ecossistema tecnológico de alta performance.
 
 ## 🧭 Evolução Arquitetural
 
