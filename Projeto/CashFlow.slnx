@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/Itens de Solução/">
+    <File Path="README.md" />
+  </Folder>
+  <Project Path="CashFlow.Application/CashFlow.Application.csproj" />
+  <Project Path="CashFlow.ConsolidationAPI/CashFlow.ConsolidationAPI.csproj" />
+  <Project Path="CashFlow.ConsolidationWorker/CashFlow.ConsolidationWorker.csproj" />
+  <Project Path="CashFlow.Domain/CashFlow.Domain.csproj" />
+  <Project Path="CashFlow.EntryAPI/CashFlow.EntryAPI.csproj" />
+  <Project Path="CashFlow.Gateway/CashFlow.Gateway.csproj" />
+  <Project Path="CashFlow.Infrastructure/CashFlow.Infrastructure.csproj" />
+  <Project Path="CashFlow.IntegrationTests/CashFlow.IntegrationTests.csproj" />
+  <Project Path="CashFlow.UnitTests/CashFlow.UnitTests.csproj" />
+</Solution>

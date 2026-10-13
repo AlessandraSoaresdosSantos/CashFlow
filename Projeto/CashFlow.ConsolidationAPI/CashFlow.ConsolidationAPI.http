@@ -1,0 +1,6 @@
+@CashFlow.ConsolidationAPI_HostAddress = http://localhost:5226
+
+GET {{CashFlow.ConsolidationAPI_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
