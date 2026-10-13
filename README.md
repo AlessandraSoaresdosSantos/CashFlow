@@ -8,7 +8,7 @@ A solução visa proporcionar um controlo absoluto e em tempo real sobre as entr
 
 A modernização tecnológica foi desenhada em três estágios para garantir entregas de valor contínuas sem paralisar o negócio:
 
-* **Visão AS-IS (O Cenário Atual):** Representa o modelo tradicional de gestão. Operações baseadas em processos manuais, controlos fragmentados ou sistemas legados com acoplamento alto. Neste cenário, a extração de métricas financeiras consolidadas é lenta, suscetível a erros humanos e incapaz de escalar de forma fluida com o aumento do volume de pedidos diários.
+* **Visão AS-IS (O Cenário Atual):** Representa o modelo tradicional de gestão. Operações baseadas em processos manuais, controles fragmentados ou sistemas legados com acoplamento alto. Neste cenário, a extração de métricas financeiras consolidadas é lenta, suscetível a erros humanos e incapaz de escalar de forma fluida com o aumento do volume de pedidos diários.
 * **Visão TÁTICA (O MVP Escalável):** É a solução implementada e disponível neste repositório. Resolve as dores imediatas do negócio utilizando padrões de arquitetura distribuída modernos (CQRS, Event-Driven com Apache Kafka, SQL Server, MongoDB e Redis). Segrega completamente o registo de novas vendas da consulta de saldos, entregando resiliência e tempos de resposta ultrarrápidos para o dia a dia da operação.
 * **Visão TARGET (O Alvo Definitivo):** O estado futuro ideal. Uma plataforma 100% Cloud-Native (SaaS), com malha de serviços (Service Mesh) avançada, pipelines de CI/CD totalmente automatizados, observabilidade preditiva e capacidade de integrar automaticamente com fornecedores e plataformas externas de entrega em múltiplas regiões.
 
