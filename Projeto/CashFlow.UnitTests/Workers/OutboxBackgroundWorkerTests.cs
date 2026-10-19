@@ -25,7 +25,6 @@ public class OutboxBackgroundWorkerTests
         _mockLogger = new Mock<ILogger<OutboxBackgroundWorker>>();
     }
 
-    // Configura o Banco de Dados em Memória e cria o "ScopeFactory" simulando o container nativo do .NET
     private IServiceScopeFactory SetupScopeFactory(AppDbContext dbContext)
     {
         var mockScopeFactory = new Mock<IServiceScopeFactory>();
@@ -45,7 +44,7 @@ public class OutboxBackgroundWorkerTests
     public async Task ProcessOutboxMessagesAsync_WhenPendingMessagesExist_ShouldPublishAndUpdateProcessedAt()
     {
         // Arrange
-        var dbName = Guid.NewGuid().ToString(); // Isola a DB por teste
+        var dbName = Guid.NewGuid().ToString(); 
         using var dbContext = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(dbName).Options);
 
         var pendingMessage = new OutboxMessage { Id = Guid.NewGuid(), Topic = "entry-events", Payload = "{ 'mock': true }" };
@@ -58,14 +57,13 @@ public class OutboxBackgroundWorkerTests
         // Act
         await worker.InvokeProcessAsync(CancellationToken.None);
 
-        // Assert - 1. Verifica se o Publish do Kafka foi invocado
         _mockMessageBus.Verify(m => m.PublishAsync("entry-events", "{ 'mock': true }"), Times.Once);
 
-        // Assert - 2. Verifica se a base de dados foi atualizada com o sucesso
+        
         var updatedMessage = await dbContext.OutboxMessages.FindAsync(pendingMessage.Id);
         Assert.NotNull(updatedMessage);
-        Assert.NotNull(updatedMessage.ProcessedAt); // A data de processamento tem de estar preenchida
-        Assert.Null(updatedMessage.Error);          // Não pode conter erros
+        Assert.NotNull(updatedMessage.ProcessedAt); 
+        Assert.Null(updatedMessage.Error);         
     }
 
     [Fact]
@@ -90,10 +88,9 @@ public class OutboxBackgroundWorkerTests
         // Act
         await worker.InvokeProcessAsync(CancellationToken.None);
 
-        // Assert - 1. O Publish tentou ser chamado
+       
         _mockMessageBus.Verify(m => m.PublishAsync("entry-events", "{ 'mock': true }"), Times.Once);
 
-        // Assert - 2. A mensagem deve continuar pendente (ProcessedAt = null) e conter o erro
         var updatedMessage = await dbContext.OutboxMessages.FindAsync(pendingMessage.Id);
         Assert.NotNull(updatedMessage);
         Assert.Null(updatedMessage.ProcessedAt); // Continua nulo para ser tentado novamente no próximo ciclo
@@ -107,7 +104,6 @@ public class OutboxBackgroundWorkerTests
         var dbName = Guid.NewGuid().ToString();
         using var dbContext = new AppDbContext(new DbContextOptionsBuilder<AppDbContext>().UseInMemoryDatabase(dbName).Options);
 
-        // Inserimos uma mensagem que JÁ FOI processada
         var processedMessage = new OutboxMessage
         {
             Id = Guid.NewGuid(),
@@ -124,15 +120,10 @@ public class OutboxBackgroundWorkerTests
         // Act
         await worker.InvokeProcessAsync(CancellationToken.None);
 
-        // Assert - Garante que o Kafka NUNCA foi chamado
+
         _mockMessageBus.Verify(m => m.PublishAsync(It.IsAny<string>(), It.IsAny<string>()), Times.Never);
     }
 
-    /// <summary>
-    /// Classe auxiliar (Subclass and Override Pattern) usada exclusivamente para testes.
-    /// Permite acedermos ao método privado 'ProcessOutboxMessagesAsync' via Reflexão (Reflection) 
-    /// sem termos de executar o ciclo infinito e o 'Task.Delay' do 'ExecuteAsync'.
-    /// </summary>
     private class TestableOutboxBackgroundWorker : OutboxBackgroundWorker
     {
         public TestableOutboxBackgroundWorker(IServiceScopeFactory scopeFactory, ILogger<OutboxBackgroundWorker> logger)

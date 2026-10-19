@@ -22,23 +22,23 @@ public class EntryApiIntegrationTests : IClassFixture<WebApplicationFactory<Cash
         {
             builder.ConfigureTestServices(services =>
             {
-                // Limpeza Nuclear
+                
                 services.RemoveAll(typeof(DbContextOptions<AppDbContext>));
                 services.RemoveAll(typeof(DbContextOptions));
 
-                // A MÁGICA: Criamos um ServiceProvider totalmente isolado apenas com os serviços do In-Memory
+     
                 var efServiceProvider = new ServiceCollection()
                     .AddEntityFrameworkInMemoryDatabase()
                     .BuildServiceProvider();
 
-                // Adiciona o Banco de Dados em Memória forçando-o a usar o contentor isolado
+               
                 services.AddDbContext<AppDbContext>(options =>
                 {
                     options.UseInMemoryDatabase("IntegrationTestsDb");
-                    options.UseInternalServiceProvider(efServiceProvider); // <- Ignora o SQL Server do Program.cs
+                    options.UseInternalServiceProvider(efServiceProvider); 
                 });
 
-                // Remove o Hosted Service (OutboxBackgroundWorker) do escopo do teste
+               
                 var hostedServiceDescriptor = services.SingleOrDefault(
                     d => d.ImplementationType == typeof(CashFlow.EntryAPI.Workers.OutboxBackgroundWorker));
                 if (hostedServiceDescriptor != null)

@@ -10,7 +10,6 @@ public class Entry
     protected Entry() { }
     public Entry(string description, decimal amount, EntryType type)
     {
-        // Regras de negócio essenciais
         if (string.IsNullOrWhiteSpace(description))
             throw new ArgumentException("A descrição do lançamento é obrigatória.");
 

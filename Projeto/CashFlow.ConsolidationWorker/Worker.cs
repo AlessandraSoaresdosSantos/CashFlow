@@ -75,7 +75,6 @@ public class Worker : BackgroundService
     {
         EntryEventDto? entryEvent = null;
 
-        // 1. Resiliência: Tratamento de JSON inválido com desvio seguro para a DLT
         try
         {
             entryEvent = JsonSerializer.Deserialize<EntryEventDto>(messageJson, new JsonSerializerOptions
@@ -95,7 +94,6 @@ public class Worker : BackgroundService
             return;
         }
 
-        // 2. Idempotência: Verificação de duplicidade no MongoDB
         var database = _mongoClient.GetDatabase(_options.DatabaseName);
         var collection = database.GetCollection<BsonDocument>(_options.CollectionName);
 
@@ -106,12 +104,10 @@ public class Worker : BackgroundService
             return;
         }
 
-        // Persistência do Snapshot no MongoDB
         var document = BsonDocument.Parse(messageJson);
         document.Set("ProcessedAt", DateTime.UtcNow);
         await collection.InsertOneAsync(document);
 
-        // 3. Atualização Atômica e Segura no Redis (Com correção do bug de tipo)
         await UpdateRedisBalanceAsync(entryEvent);
     }
 
@@ -123,7 +119,6 @@ public class Worker : BackgroundService
 
         double amountToApply;
 
-        // Validação estrita e defensiva do tipo de lançamento
         if (entryEvent.Type == EntryType.Credit)
         {
             amountToApply = (double)entryEvent.Amount;

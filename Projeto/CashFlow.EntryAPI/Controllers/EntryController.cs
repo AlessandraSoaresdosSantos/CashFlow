@@ -12,7 +12,6 @@ public class EntryController : ControllerBase
 {
     private readonly ICreateEntryCommandHandler _commandHandler;
 
-    // Injeção de dependência do Handler
     public EntryController(ICreateEntryCommandHandler commandHandler)
     {
         _commandHandler = commandHandler;

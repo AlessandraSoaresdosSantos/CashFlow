@@ -15,7 +15,6 @@ public class CreateEntryCommandHandlerTests
 
     public CreateEntryCommandHandlerTests()
     {
-        // Agora só precisamos de mockar o repositório, pois o Kafka foi removido do Handler!
         _mockRepository = new Mock<IEntryRepository>();
         _handler = new CreateEntryCommandHandler(_mockRepository.Object);
     }
@@ -37,7 +36,6 @@ public class CreateEntryCommandHandlerTests
         // Assert
         Assert.NotEqual(Guid.Empty, resultId);
 
-        // Garante que o método com o Outbox foi invocado
         _mockRepository.Verify(r => r.AddWithOutboxAsync(It.IsAny<Entry>(), It.IsAny<OutboxMessage>()), Times.Once);
     }
 
@@ -55,8 +53,6 @@ public class CreateEntryCommandHandlerTests
         Entry? capturedEntry = null;
         OutboxMessage? capturedOutbox = null;
 
-        // Utilizamos o Callback do Moq para "capturar" os objetos que o Handler criou internamente
-        // antes de enviá-los para o repositório.
         _mockRepository
             .Setup(r => r.AddWithOutboxAsync(It.IsAny<Entry>(), It.IsAny<OutboxMessage>()))
             .Callback<Entry, OutboxMessage>((entry, outbox) =>

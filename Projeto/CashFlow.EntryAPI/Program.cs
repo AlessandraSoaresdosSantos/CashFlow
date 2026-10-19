@@ -13,11 +13,10 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // 1. Configuração da Base de Dados SQL Server
+    
         var connectionString = "Server=localhost,1433;Database=CashFlowDb;User Id=sa;Password=YourStrong!Passw0rd;TrustServerCertificate=True";
         builder.Services.AddDbContext<AppDbContext>(opts => opts.UseSqlServer(connectionString));
 
-        // 2. Configuração de Autenticação JWT (Keycloak)
         builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
         {
             options.Authority = "http://localhost:8080/realms/cashflow";
@@ -28,7 +27,6 @@ public class Program
             };
         });
 
-        // 3. Injeção de Dependências
         builder.Services.AddScoped<IEntryRepository, EntryRepository>();
         builder.Services.AddScoped<ICreateEntryCommandHandler, CreateEntryCommandHandler>();
         builder.Services.AddScoped<IMessageBus, KafkaMessageBus>();

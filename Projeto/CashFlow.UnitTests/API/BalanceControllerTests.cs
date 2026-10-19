@@ -33,7 +33,6 @@ public class BalanceControllerTests
         var responseValue = okResult.Value;
         Assert.NotNull(responseValue);
 
-        // CORREÇÃO: Utiliza reflexão segura em C# para ler propriedades de tipos anónimos públicos/internos
         var type = responseValue.GetType();
         var dateProperty = type.GetProperty("Date")?.GetValue(responseValue)?.ToString();
         var balanceProperty = type.GetProperty("Balance")?.GetValue(responseValue);
@@ -46,8 +45,8 @@ public class BalanceControllerTests
     }
 
     [Theory]
-    [InlineData("2026/10/12")] // Formato inválido com barras
-    [InlineData("12-10-2026")] // Formato invertido (dd-MM-yyyy)
+    [InlineData("2026/10/12")] 
+    [InlineData("12-10-2026")] 
     [InlineData("data-invalida")]
     public async Task Get_WhenCalledWithInvalidDate_ShouldReturnBadRequest(string invalidDate)
     {

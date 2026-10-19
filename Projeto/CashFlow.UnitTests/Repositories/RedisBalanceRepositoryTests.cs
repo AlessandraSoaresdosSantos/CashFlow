@@ -76,11 +76,11 @@ public class RedisBalanceRepositoryTests
         var parameter = "2026-10-18";
         var cacheKey = $"balance:{parameter}";
 
-        // 1. Simula que não há nada no cache Redis
+       
         _mockRedisDb.Setup(db => db.StringGetAsync(cacheKey, CommandFlags.None))
             .ReturnsAsync(RedisValue.Null);
 
-        // 2. Prepara o MongoDB para devolver o saldo esperado
+
         SetupMongoReturns(expectedBalance);
 
         var repository = new RedisBalanceRepository(_mockRedisMultiplexer.Object, _mockMongoDatabase.Object, _mockLogger.Object);

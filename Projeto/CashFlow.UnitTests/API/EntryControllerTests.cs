@@ -17,10 +17,9 @@ public class EntryControllerTests
 
     public EntryControllerTests()
     {
-        // Instanciamos o Mock do Handler para isolar a camada de Aplicação/Infraestrutura
+       
         _mockHandler = new Mock<ICreateEntryCommandHandler>();
 
-        // Injetamos o mock no controlador
         _controller = new EntryController(_mockHandler.Object);
     }
 
@@ -36,7 +35,6 @@ public class EntryControllerTests
             Type = EntryType.Credit
         };
 
-        // Configuramos o mock para simular o processamento bem-sucedido e devolver um ID
         _mockHandler
             .Setup(h => h.Handle(It.IsAny<CreateEntryCommand>()))
             .ReturnsAsync(expectedId);
@@ -48,7 +46,6 @@ public class EntryControllerTests
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(201, objectResult.StatusCode);
 
-        // Verifica se a resposta contém o ID gerado (usando verificação de tipo flexível para objetos anónimos)
         Assert.NotNull(objectResult.Value);
         var valueProperty = objectResult.Value.GetType().GetProperty("Id");
         Assert.NotNull(valueProperty);
@@ -56,7 +53,6 @@ public class EntryControllerTests
         var actualId = (Guid?)valueProperty.GetValue(objectResult.Value);
         Assert.Equal(expectedId, actualId);
 
-        // Verifica se o Handler foi de facto chamado uma vez com o nosso comando
         _mockHandler.Verify(h => h.Handle(command), Times.Once);
     }
 
@@ -74,7 +70,6 @@ public class EntryControllerTests
         Assert.Equal(400, badRequestResult.StatusCode);
         Assert.Equal("O payload do lançamento não pode ser nulo.", badRequestResult.Value);
 
-        // Garante que o Handler nunca é chamado se o payload for nulo
         _mockHandler.Verify(h => h.Handle(It.IsAny<CreateEntryCommand>()), Times.Never);
     }
 

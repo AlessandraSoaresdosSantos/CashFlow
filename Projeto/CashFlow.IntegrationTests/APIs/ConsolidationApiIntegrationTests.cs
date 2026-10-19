@@ -59,7 +59,7 @@ public class ConsolidationApiIntegrationTests : IClassFixture<WebApplicationFact
         // Act
         var response = await client.GetAsync($"/api/balance/{dateParameter}");
 
-        // Garante que se rebentar com erro 500, o teste mostra a mensagem
+       
         var responseContent = await response.Content.ReadAsStringAsync();
         Assert.True(response.IsSuccessStatusCode, $"A API retornou {response.StatusCode}. Detalhe: {responseContent}");
 
