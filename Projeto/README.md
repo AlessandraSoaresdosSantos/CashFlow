@@ -60,32 +60,25 @@ A solução é composta por 9 projetos, organizados de forma a respeitar a separ
 ```
 
 🛠️ Tecnologias Utilizadas
+```text
 Backend: C# com .NET 8 (Web API, Worker Services)
-
 API Gateway: YARP (Yet Another Reverse Proxy)
-
 Mensageria: Apache Kafka
-
 Bancos de Dados:
-
 SQL Server: Dados Relacionais e Transacionais.
-
 MongoDB: Snapshots baseados em Documentos.
-
 Redis: Cache de Saldo Consolidado.
-
 Testes: xUnit, Moq, WebApplicationFactory.
+```
 
 🚀 Guia Prático de Execução Local (Passo a Passo)
+```text
 Siga os passos abaixo exatamente nesta ordem para garantir a correta inicialização do ecossistema.
 
 Passo 1: Instalação de Dependências (Pré-requisitos)
 Certifique-se de que sua máquina possui as seguintes ferramentas instaladas:
-
 .NET 8 SDK
-
 Docker Desktop (rodando em background)
-
 Cliente de banco de dados (ex: DBeaver, Azure Data Studio ou SQL Server Management Studio)
 
 Passo 2: Subir a Infraestrutura com Docker
@@ -99,11 +92,8 @@ Passo 3: Configuração do Banco de Dados (Abordagem Database First)
 Este projeto utiliza a abordagem Database First. Isso significa que as tabelas não são geradas via EF Core Migrations no startup; o schema deve existir previamente no SQL Server.
 
 Conecte-se ao SQL Server local provisionado pelo Docker (via DBeaver ou SSMS):
-
 Host: localhost,1433
-
 User: sa
-
 Password: (Insira_Aqui_A_Senha_Configurada_No_Docker)
 
 Abra o script SQL localizado na pasta de infraestrutura do repositório (ex: scripts/init_database.sql).
@@ -130,8 +120,10 @@ dotnet run --project src/CashFlow.ConsolidationAPI/CashFlow.ConsolidationAPI.csp
 Bash
 dotnet run --project src/CashFlow.Gateway/CashFlow.Gateway.csproj
 Após executar os comandos, todas as chamadas deverão ser feitas para a porta 5000 (Gateway).
+```
 
 🧪 Validação e Testes Automatizados
+```text
 A arquitetura do projeto possui uma robusta suíte de testes projetada para validar as integrações com os bancos, resiliência do cache e regras de negócio sem necessidade de infraestrutura manual para os testes isolados.
 
 1. Testes Unitários
@@ -149,4 +141,6 @@ Na raiz do projeto, execute:
 
 Bash
 dotnet test src/CashFlow.IntegrationTests/CashFlow.IntegrationTests.csproj
+```
+
 Para informações técnicas de arquitetura, trade-offs e decisões arquiteturais de nível macro, consulte o README GERAL do portfólio.
