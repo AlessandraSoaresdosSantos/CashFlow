@@ -2,10 +2,7 @@
 using CashFlow.Application.UseCases.Commands;
 using CashFlow.Infrastructure.Data.Relational;
 using CashFlow.Infrastructure.Messaging;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Builder;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.IdentityModel.Tokens;
 
 namespace CashFlow.EntryAPI;
@@ -33,8 +30,9 @@ public class Program
 
         // 3. Injeção de Dependências
         builder.Services.AddScoped<IEntryRepository, EntryRepository>();
-        builder.Services.AddSingleton<IMessageBus, KafkaMessageBus>(); // Singleton para manter a ligação aberta
-        builder.Services.AddScoped<CreateEntryCommandHandler>();
+        builder.Services.AddScoped<ICreateEntryCommandHandler, CreateEntryCommandHandler>();
+        builder.Services.AddScoped<IMessageBus, KafkaMessageBus>();
+        builder.Services.AddHostedService<Workers.OutboxBackgroundWorker>();
 
         builder.Services.AddAuthorization();
         builder.Services.AddControllers();

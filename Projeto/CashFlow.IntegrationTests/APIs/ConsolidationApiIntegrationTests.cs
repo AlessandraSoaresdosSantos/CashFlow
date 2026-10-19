@@ -1,65 +1,92 @@
-﻿using System.Net;
-using System.Net.Http;
-using System.Text.Json;
-using System.Threading.Tasks;
-using CashFlow.Application.Interfaces;
-using CashFlow.IntegrationTests.Config;
+﻿using CashFlow.Application.Interfaces;
+using CashFlow.ConsolidationAPI;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization.Policy;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Moq;
+using System.Net;
+using System.Security.Claims;
+using System.Threading.Tasks;
 using Xunit;
 
-namespace CashFlow.IntegrationTests.APIs;
+namespace CashFlow.IntegrationTests;
 
 public class ConsolidationApiIntegrationTests : IClassFixture<WebApplicationFactory<CashFlow.ConsolidationAPI.Program>>
 {
-    private readonly HttpClient _client;
+    private readonly WebApplicationFactory<Program> _factory;
+    private readonly Mock<IBalanceRepository> _mockRepository;
 
     public ConsolidationApiIntegrationTests(WebApplicationFactory<CashFlow.ConsolidationAPI.Program> factory)
     {
-        var customFactory = factory.WithWebHostBuilder(builder =>
+        _mockRepository = new Mock<IBalanceRepository>();
+
+        _factory = factory.WithWebHostBuilder(builder =>
         {
             builder.ConfigureTestServices(services =>
-            {
-                // 1. Remove a dependência real do Redis
-                var redisDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IBalanceRepository));
-                if (redisDescriptor != null) services.Remove(redisDescriptor);
-
-                // 2. Adiciona um Mock que simula o Redis a devolver um saldo de R$ 2500,00
-                var mockRedisRepo = new Mock<IBalanceRepository>();
-                mockRedisRepo.Setup(r => r.GetBalanceAsync("2026-10-12")).ReturnsAsync(2500.00);
-                services.AddScoped(_ => mockRedisRepo.Object);
-
-                // 3. Injeta a Autenticação Falsa
-                services.AddAuthentication("Test")
-                        .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
+            { 
+                services.RemoveAll(typeof(IBalanceRepository));
+                 
+                services.AddScoped(_ => _mockRepository.Object);
+                 
+                services.AddSingleton<IPolicyEvaluator, FakePolicyEvaluator>();
+                 
+                var hostedServiceDescriptor = services.SingleOrDefault(
+                    d => d.ImplementationType?.Name.Contains("KafkaConsumerWorker") == true);
+                if (hostedServiceDescriptor != null)
+                {
+                    services.Remove(hostedServiceDescriptor);
+                }
             });
         });
-
-        _client = customFactory.CreateClient();
-        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Test");
     }
 
     [Fact]
-    public async Task GetBalance_ForSpecificDate_ShouldReturnOkWithCorrectBalance()
+    public async Task GetBalance_WhenRequested_ShouldReturnOkAndTotalAmount()
     {
         // Arrange
-        var requestDate = "2026-10-12";
+        var client = _factory.CreateClient();
+        var expectedBalance = 7500.50m;
+        var dateParameter = "2026-10-18";
+
+        _mockRepository.Setup(r => r.GetBalanceAsync(dateParameter))
+             .ReturnsAsync(expectedBalance);
 
         // Act
-        var response = await _client.GetAsync($"/api/balance/{requestDate}");
+        var response = await client.GetAsync($"/api/balance/{dateParameter}");
+
+        // Garante que se rebentar com erro 500, o teste mostra a mensagem
+        var responseContent = await response.Content.ReadAsStringAsync();
+        Assert.True(response.IsSuccessStatusCode, $"A API retornou {response.StatusCode}. Detalhe: {responseContent}");
 
         // Assert
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
 
-        // Lê e valida o JSON devolvido
-        var responseString = await response.Content.ReadAsStringAsync();
-        using var jsonDocument = JsonDocument.Parse(responseString);
-        var root = jsonDocument.RootElement;
+        // Verifica o corpo da resposta HTTP
+        Assert.Contains("7500.50", responseContent);
+    }
+}
+ 
+public class FakePolicyEvaluator : IPolicyEvaluator
+{
+    public virtual async Task<AuthenticateResult> AuthenticateAsync(AuthorizationPolicy policy, HttpContext context)
+    {
+        var principal = new ClaimsPrincipal();
+        principal.AddIdentity(new ClaimsIdentity(new[] {
+            new Claim(ClaimTypes.NameIdentifier, "IntegrationTestUser")
+        }, "FakeScheme"));
 
-        Assert.Equal(requestDate, root.GetProperty("date").GetString());
-        Assert.Equal(2500.00, root.GetProperty("balance").GetDouble());
+        return await Task.FromResult(AuthenticateResult.Success(new AuthenticationTicket(principal,
+            new AuthenticationProperties(), "FakeScheme")));
+    }
+
+    public virtual async Task<PolicyAuthorizationResult> AuthorizeAsync(AuthorizationPolicy policy,
+        AuthenticateResult authenticationResult, HttpContext context, object resource)
+    {
+        return await Task.FromResult(PolicyAuthorizationResult.Success());
     }
 }

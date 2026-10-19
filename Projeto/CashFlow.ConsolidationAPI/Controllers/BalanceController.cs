@@ -1,7 +1,9 @@
-﻿using System.Threading.Tasks;
+﻿using CashFlow.Application.Interfaces;
 using CashFlow.Application.UseCases.Queries;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using System.Globalization;
+using System.Threading.Tasks;
 
 namespace CashFlow.ConsolidationAPI.Controllers;
 
@@ -10,10 +12,10 @@ namespace CashFlow.ConsolidationAPI.Controllers;
 [Route("api/[controller]")]
 public class BalanceController : ControllerBase
 {
-    private readonly GetBalanceQueryHandler _handler;
+    private readonly IGetBalanceQueryHandler _handler;
 
     // Recebe o Orquestrador da Query por injeção
-    public BalanceController(GetBalanceQueryHandler handler)
+    public BalanceController(IGetBalanceQueryHandler handler)
     {
         _handler = handler;
     }
@@ -21,13 +23,17 @@ public class BalanceController : ControllerBase
     [HttpGet("{date}")]
     public async Task<IActionResult> Get(string date)
     {
-        // Prepara a Query
+        // Validação estrita do formato da data (yyyy-MM-dd)
+        if (!DateTime.TryParseExact(date, "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None, out _))
+        {
+            return BadRequest(new { Error = "Formato de data inválido. Utilize o formato yyyy-MM-dd." });
+        }
+
+        
         var query = new GetBalanceQuery(date);
 
-        // Executa a busca no Redis
         var balance = await _handler.Handle(query);
 
-        // Devolve o saldo em formato JSON (HTTP 200 OK)
         return Ok(new
         {
             Date = date,

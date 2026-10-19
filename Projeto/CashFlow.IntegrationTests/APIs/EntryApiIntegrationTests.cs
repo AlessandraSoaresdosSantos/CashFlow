@@ -1,25 +1,19 @@
-﻿using System.Linq;
-using System.Net;
-using System.Net.Http;
-using System.Net.Http.Json;
-using System.Threading.Tasks;
-using CashFlow.Application.Interfaces;
-using CashFlow.Application.UseCases.Commands;
+﻿using CashFlow.Application.UseCases.Commands;
+using CashFlow.Domain.Enums;
+using CashFlow.EntryAPI;
 using CashFlow.Infrastructure.Data.Relational;
-using CashFlow.IntegrationTests.Config;
-using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.TestHost;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
-using Moq;
-using Xunit;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using System.Net;
+using System.Net.Http.Json;
 
-namespace CashFlow.IntegrationTests.APIs;
+namespace CashFlow.IntegrationTests;
 
 public class EntryApiIntegrationTests : IClassFixture<WebApplicationFactory<CashFlow.EntryAPI.Program>>
 {
-    private readonly HttpClient _client;
     private readonly WebApplicationFactory<CashFlow.EntryAPI.Program> _factory;
 
     public EntryApiIntegrationTests(WebApplicationFactory<CashFlow.EntryAPI.Program> factory)
@@ -28,71 +22,81 @@ public class EntryApiIntegrationTests : IClassFixture<WebApplicationFactory<Cash
         {
             builder.ConfigureTestServices(services =>
             {
-                // 1. Remove qualquer opção anterior
-                var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
-                if (descriptor != null) services.Remove(descriptor);
+                // Limpeza Nuclear
+                services.RemoveAll(typeof(DbContextOptions<AppDbContext>));
+                services.RemoveAll(typeof(DbContextOptions));
 
-                // 2. A "BALA DE PRATA": Isolamento de Provedor (Service Provider Isolation)
-                // Isto cria um mini-motor de injeção fechado apenas para o banco em memória,
-                // impedindo totalmente o conflito com o SQL Server do Program.cs.
-                var inMemoryServiceProvider = new ServiceCollection()
+                // A MÁGICA: Criamos um ServiceProvider totalmente isolado apenas com os serviços do In-Memory
+                var efServiceProvider = new ServiceCollection()
                     .AddEntityFrameworkInMemoryDatabase()
                     .BuildServiceProvider();
 
+                // Adiciona o Banco de Dados em Memória forçando-o a usar o contentor isolado
                 services.AddDbContext<AppDbContext>(options =>
                 {
-                    options.UseInMemoryDatabase("IntegrationDbForEntry")
-                           .UseInternalServiceProvider(inMemoryServiceProvider); // <-- Força a usar a bolha
+                    options.UseInMemoryDatabase("IntegrationTestsDb");
+                    options.UseInternalServiceProvider(efServiceProvider); // <- Ignora o SQL Server do Program.cs
                 });
 
-                // 3. Substitui o Kafka por um Mock
-                var kafkaDescriptor = services.SingleOrDefault(d => d.ServiceType == typeof(IMessageBus));
-                if (kafkaDescriptor != null) services.Remove(kafkaDescriptor);
-                services.AddSingleton(new Mock<IMessageBus>().Object);
-
-                // 4. Injeta a Autenticação Falsa
-                services.AddAuthentication("Test")
-                        .AddScheme<AuthenticationSchemeOptions, TestAuthHandler>("Test", options => { });
-
-                // 5. Força a aplicação a ignorar o "Bearer"
-                services.Configure<AuthenticationOptions>(options =>
+                // Remove o Hosted Service (OutboxBackgroundWorker) do escopo do teste
+                var hostedServiceDescriptor = services.SingleOrDefault(
+                    d => d.ImplementationType == typeof(CashFlow.EntryAPI.Workers.OutboxBackgroundWorker));
+                if (hostedServiceDescriptor != null)
                 {
-                    options.DefaultAuthenticateScheme = "Test";
-                    options.DefaultChallengeScheme = "Test";
-                    options.DefaultScheme = "Test";
-                });
+                    services.Remove(hostedServiceDescriptor);
+                }
             });
         });
-
-        _client = _factory.CreateClient(new WebApplicationFactoryClientOptions
-        {
-            AllowAutoRedirect = false
-        });
-
-        _client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Test");
     }
 
     [Fact]
-    public async Task PostEntry_WithValidData_ShouldReturnCreatedAndSaveToDatabase()
+    public async Task PostEntry_WhenPayloadIsValid_ShouldReturnCreatedAndPersistInOutbox()
     {
         // Arrange
-        var command = new CreateEntryCommand("Venda de Pudim Tradicional", 45.50m, 1);
+        var client = _factory.CreateClient();
+        var command = new CreateEntryCommand
+        {
+            Description = "Pagamento da internet",
+            Amount = 150.50m,
+            Type = EntryType.Debit
+        };
 
         // Act
-        var response = await _client.PostAsJsonAsync("/api/entry", command);
-        var erroDaApi = await response.Content.ReadAsStringAsync();
+        var response = await client.PostAsJsonAsync("/api/entry", command);
+        var responseContent = await response.Content.ReadAsStringAsync();
 
-        // Assert
+        // Assert - 1
         Assert.True(response.StatusCode == HttpStatusCode.Created,
-            $"FALHA NA API! Status retornado: {response.StatusCode} | Mensagem da API: {erroDaApi}");
+            $"Falha! A API retornou {response.StatusCode}. Detalhe do Erro: {responseContent}");
 
-        // Validação extra: Banco de dados
+        // Assert - 2
         using var scope = _factory.Services.CreateScope();
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        var savedEntry = await dbContext.Entries.FirstOrDefaultAsync(e => e.Description == "Venda de Pudim Tradicional");
+        var entries = await dbContext.Entries.ToListAsync();
+        var outboxMessages = await dbContext.OutboxMessages.ToListAsync();
 
-        Assert.NotNull(savedEntry);
-        Assert.Equal(45.50m, savedEntry.Amount);
+        Assert.Single(entries);
+        Assert.Equal("Pagamento da internet", entries[0].Description);
+        Assert.Equal(150.50m, entries[0].Amount);
+
+        Assert.Single(outboxMessages);
+        Assert.Equal("entry-events", outboxMessages[0].Topic);
+        Assert.Null(outboxMessages[0].ProcessedAt);
+        Assert.Contains(entries[0].Id.ToString(), outboxMessages[0].Payload);
+    }
+
+    [Fact]
+    public async Task PostEntry_WhenPayloadIsMissing_ShouldReturnBadRequest()
+    {
+        // Arrange
+        var client = _factory.CreateClient();
+        CreateEntryCommand? nullCommand = null;
+
+        // Act
+        var response = await client.PostAsJsonAsync("/api/entry", nullCommand);
+
+        // Assert
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
     }
 }

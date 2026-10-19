@@ -1,25 +1,20 @@
-﻿using System.Threading.Tasks;
-using CashFlow.Application.Interfaces;
+﻿namespace CashFlow.Application.UseCases.Queries;
 
-namespace CashFlow.Application.UseCases.Queries;
-
-// O Input da consulta (Apenas a data)
-public record GetBalanceQuery(string Date);
-
-// O orquestrador da consulta
-public class GetBalanceQueryHandler
+public class GetBalanceQuery
 {
-    private readonly IBalanceRepository _repository;
+    /// <summary>
+    /// A data (ou identificador) para a qual queremos consultar o saldo.
+    /// Exemplo de formato esperado: "2026-10-18"
+    /// </summary>
+    public string Date { get; set; }
 
-    public GetBalanceQueryHandler(IBalanceRepository repository)
+    public GetBalanceQuery()
     {
-        _repository = repository;
+        Date = string.Empty;
     }
 
-    public async Task<double> Handle(GetBalanceQuery query)
+    public GetBalanceQuery(string date)
     {
-        // Aqui poderíamos ter lógicas extra, mas no caso do saldo, 
-        // basta delegar a busca rápida para o repositório.
-        return await _repository.GetBalanceAsync(query.Date);
+        Date = date;
     }
 }

@@ -4,5 +4,5 @@ namespace CashFlow.Application.Interfaces;
 
 public interface IBalanceRepository
 {
-    Task<double> GetBalanceAsync(string date);
+    Task<decimal> GetBalanceAsync(string parameter);
 }

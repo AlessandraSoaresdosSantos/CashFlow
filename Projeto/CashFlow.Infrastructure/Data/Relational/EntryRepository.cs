@@ -13,13 +13,21 @@ public class EntryRepository : IEntryRepository
         _context = context;
     }
 
-    public async Task AddAsync(Entry entry)
+     public async Task AddAsync(Entry entry)
     {
         await _context.Entries.AddAsync(entry);
     }
 
     public async Task SaveChangesAsync()
     {
+        await _context.SaveChangesAsync();
+    }
+
+    public async Task AddWithOutboxAsync(Entry entry, OutboxMessage outbox)
+    {
+        await _context.Entries.AddAsync(entry);
+        await _context.OutboxMessages.AddAsync(outbox);
+
         await _context.SaveChangesAsync();
     }
 }

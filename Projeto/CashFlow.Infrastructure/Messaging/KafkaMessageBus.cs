@@ -1,53 +1,42 @@
-﻿using System;
-using System.Text.Json;
+﻿using Confluent.Kafka;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
+using System;
 using System.Threading.Tasks;
 using CashFlow.Application.Interfaces;
-using Confluent.Kafka;
-using Microsoft.Extensions.Logging;
 
 namespace CashFlow.Infrastructure.Messaging;
 
-public class KafkaMessageBus : IMessageBus, IDisposable
+public class KafkaMessageBus : IMessageBus
 {
-    private readonly IProducer<Null, string> _producer;
     private readonly ILogger<KafkaMessageBus> _logger;
+    private readonly string _bootstrapServers;
 
-    public KafkaMessageBus(ILogger<KafkaMessageBus> logger)
+    public KafkaMessageBus(ILogger<KafkaMessageBus> logger, IConfiguration configuration)
     {
         _logger = logger;
 
-        var config = new ProducerConfig
-        {
-            BootstrapServers = "localhost:9092",
-            // Configurações para garantir a entrega (Resiliência)
-            Acks = Acks.All,
-            MessageSendMaxRetries = 3
-        };
-
-        _producer = new ProducerBuilder<Null, string>(config).Build();
+        _bootstrapServers = configuration["Kafka:BootstrapServers"]
+                             ?? throw new ArgumentNullException("Kafka:BootstrapServers não configurado no appsettings.json.");
     }
 
     public async Task PublishAsync<T>(string topic, T message)
     {
+        var config = new ProducerConfig { BootstrapServers = _bootstrapServers };
+
+        using var producer = new ProducerBuilder<Null, string>(config).Build();
+
         try
         {
-            var messageJson = JsonSerializer.Serialize(message);
-            var kafkaMessage = new Message<Null, string> { Value = messageJson };
+            var payload = typeof(T) == typeof(string) ? message as string : System.Text.Json.JsonSerializer.Serialize(message);
 
-            var deliveryResult = await _producer.ProduceAsync(topic, kafkaMessage);
-
-            _logger.LogInformation($"Evento publicado no tópico {deliveryResult.Topic}. Offset: {deliveryResult.Offset}");
+            await producer.ProduceAsync(topic, new Message<Null, string> { Value = payload });
+            _logger.LogInformation("Mensagem publicada com sucesso no tópico {Topic}", topic);
         }
         catch (ProduceException<Null, string> ex)
         {
-            _logger.LogError($"Falha ao publicar no Kafka: {ex.Error.Reason}");
-            throw; // Em produção, isto ativaria um padrão Outbox/Retry
+            _logger.LogError(ex, "Falha ao comunicar com o Kafka no tópico {Topic}.", topic);
+            throw; 
         }
-    }
-
-    public void Dispose()
-    {
-        _producer.Flush(TimeSpan.FromSeconds(10));
-        _producer.Dispose();
     }
 }

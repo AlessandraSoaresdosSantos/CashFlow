@@ -1,106 +1,112 @@
 ﻿using System;
 using System.Threading.Tasks;
-using CashFlow.Application.Interfaces;
-using CashFlow.Application.UseCases.Commands;
-using CashFlow.Domain.Entities;
-using CashFlow.Domain.Events;
-using CashFlow.EntryAPI.Controllers;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging;
 using Moq;
 using Xunit;
+using CashFlow.EntryAPI.Controllers;
+using CashFlow.Application.Interfaces;
+using CashFlow.Application.UseCases.Commands;
+using CashFlow.Domain.Enums;
 
-namespace CashFlow.UnitTests.API;
+namespace CashFlow.UnitTests.Controllers;
 
 public class EntryControllerTests
 {
-    private readonly Mock<IEntryRepository> _mockRepo;
-    private readonly Mock<IMessageBus> _mockBus;
-    private readonly Mock<ILogger<EntryController>> _mockLogger;
-    private readonly CreateEntryCommandHandler _handler;
+    private readonly Mock<ICreateEntryCommandHandler> _mockHandler;
     private readonly EntryController _controller;
 
     public EntryControllerTests()
     {
-        // 1. Inicializa os Mocks das dependências externas
-        _mockRepo = new Mock<IEntryRepository>();
-        _mockBus = new Mock<IMessageBus>();
-        _mockLogger = new Mock<ILogger<EntryController>>();
+        // Instanciamos o Mock do Handler para isolar a camada de Aplicação/Infraestrutura
+        _mockHandler = new Mock<ICreateEntryCommandHandler>();
 
-        // 2. Instancia o Handler injetando os mocks
-        _handler = new CreateEntryCommandHandler(_mockRepo.Object, _mockBus.Object);
-
-        // 3. Instancia o Controller injetando o Handler e o Logger falsos
-        _controller = new EntryController(_handler, _mockLogger.Object);
+        // Injetamos o mock no controlador
+        _controller = new EntryController(_mockHandler.Object);
     }
 
     [Fact]
-    public async Task Post_ValidCommand_ShouldReturnCreated()
+    public async Task Create_WhenCommandIsValid_ShouldReturnCreated201()
     {
-        // Arrange: Prepara um lançamento válido
-        var command = new CreateEntryCommand("Venda de Pudim", 150.00m, 1);
+        // Arrange
+        var expectedId = Guid.NewGuid();
+        var command = new CreateEntryCommand
+        {
+            Description = "Recebimento de cliente",
+            Amount = 500.00m,
+            Type = EntryType.Credit
+        };
 
-        // Act: Executa o endpoint
-        var result = await _controller.Post(command);
-
-        // Assert: Valida se retornou HTTP 201 Created
-        var createdResult = Assert.IsType<CreatedResult>(result);
-        Assert.Equal(201, createdResult.StatusCode);
-
-        // Verifica se as rotinas de banco e mensageria foram acionadas
-        _mockRepo.Verify(r => r.AddAsync(It.IsAny<Entry>()), Times.Once);
-        _mockBus.Verify(b => b.PublishAsync("entry-events", It.IsAny<EntryCreatedEvent>()), Times.Once);
-    }
-
-    [Theory]
-    [InlineData("", 100)]   // Descrição em branco
-    [InlineData("Venda", 0)] // Valor zero
-    [InlineData("Venda", -10)] // Valor negativo
-    public async Task Post_InvalidInput_ShouldReturnBadRequest(string description, decimal amount)
-    {
-        // Arrange: Prepara comandos com dados inválidos que falham na validação do Controller
-        var command = new CreateEntryCommand(description, amount, 1);
+        // Configuramos o mock para simular o processamento bem-sucedido e devolver um ID
+        _mockHandler
+            .Setup(h => h.Handle(It.IsAny<CreateEntryCommand>()))
+            .ReturnsAsync(expectedId);
 
         // Act
-        var result = await _controller.Post(command);
+        var result = await _controller.Create(command);
 
-        // Assert: Valida se retornou HTTP 400 Bad Request
+        // Assert
+        var objectResult = Assert.IsType<ObjectResult>(result);
+        Assert.Equal(201, objectResult.StatusCode);
+
+        // Verifica se a resposta contém o ID gerado (usando verificação de tipo flexível para objetos anónimos)
+        Assert.NotNull(objectResult.Value);
+        var valueProperty = objectResult.Value.GetType().GetProperty("Id");
+        Assert.NotNull(valueProperty);
+
+        var actualId = (Guid?)valueProperty.GetValue(objectResult.Value);
+        Assert.Equal(expectedId, actualId);
+
+        // Verifica se o Handler foi de facto chamado uma vez com o nosso comando
+        _mockHandler.Verify(h => h.Handle(command), Times.Once);
+    }
+
+    [Fact]
+    public async Task Create_WhenCommandIsNull_ShouldReturnBadRequest400()
+    {
+        // Arrange
+        CreateEntryCommand? nullCommand = null;
+
+        // Act
+        var result = await _controller.Create(nullCommand);
+
+        // Assert
         var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
         Assert.Equal(400, badRequestResult.StatusCode);
+        Assert.Equal("O payload do lançamento não pode ser nulo.", badRequestResult.Value);
 
-        // Garante que o banco de dados NÃO foi chamado
-        _mockRepo.Verify(r => r.AddAsync(It.IsAny<Entry>()), Times.Never);
+        // Garante que o Handler nunca é chamado se o payload for nulo
+        _mockHandler.Verify(h => h.Handle(It.IsAny<CreateEntryCommand>()), Times.Never);
     }
 
     [Fact]
-    public async Task Post_DomainError_ShouldReturnBadRequest()
+    public async Task Create_WhenHandlerThrowsException_ShouldReturnInternalServerError500()
     {
-        // Arrange: Passamos um Type inválido (ex: 99) para passar pela validação da API, 
-        // mas forçar um disparo de ArgumentException dentro da regra de negócio (Domain)
-        var command = new CreateEntryCommand("Venda de Pudim", 100.00m, 99);
+        // Arrange
+        var command = new CreateEntryCommand
+        {
+            Description = "Erro forçado",
+            Amount = 10m,
+            Type = EntryType.Debit
+        };
+
+        // Simulamos uma quebra interna (ex: Banco de dados fora do ar e falha no Outbox)
+        _mockHandler
+            .Setup(h => h.Handle(It.IsAny<CreateEntryCommand>()))
+            .ThrowsAsync(new Exception("Falha de conexão com o banco de dados."));
 
         // Act
-        var result = await _controller.Post(command);
+        var result = await _controller.Create(command);
 
-        // Assert: O bloco catch (ArgumentException) deve capturar e retornar 400
-        var badRequestResult = Assert.IsType<BadRequestObjectResult>(result);
-        Assert.Equal(400, badRequestResult.StatusCode);
-    }
-
-    [Fact]
-    public async Task Post_RepositoryThrowsException_ShouldReturnInternalServerError()
-    {
-        // Arrange: Simula uma queda catastrófica no SQL Server
-        var command = new CreateEntryCommand("Venda de Pudim", 100.00m, 1);
-
-        _mockRepo.Setup(r => r.AddAsync(It.IsAny<Entry>()))
-                 .ThrowsAsync(new Exception("Database connection failed"));
-
-        // Act
-        var result = await _controller.Post(command);
-
-        // Assert: O bloco catch (Exception) deve capturar e retornar 500
+        // Assert
         var objectResult = Assert.IsType<ObjectResult>(result);
         Assert.Equal(500, objectResult.StatusCode);
+
+        // Verifica se a resposta contém a mensagem de erro formatada
+        Assert.NotNull(objectResult.Value);
+        var errorProperty = objectResult.Value.GetType().GetProperty("Error");
+        Assert.NotNull(errorProperty);
+
+        var actualError = errorProperty.GetValue(objectResult.Value) as string;
+        Assert.Equal("Erro interno ao processar o lançamento financeiro.", actualError);
     }
 }

@@ -1,11 +1,13 @@
-﻿using CashFlow.Application.Interfaces;
-using CashFlow.Application.UseCases.Queries;
-using CashFlow.Infrastructure.Data.Cache;
-using Microsoft.AspNetCore.Authentication.JwtBearer;
-using Microsoft.AspNetCore.Builder;
+﻿using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.IdentityModel.Tokens;
 using StackExchange.Redis;
+using MongoDB.Driver;
+using System;
+using CashFlow.Application.Interfaces;
+using CashFlow.Infrastructure.Data.Caching;
+using CashFlow.Application.UseCases.Handlers;
 
 namespace CashFlow.ConsolidationAPI;
 
@@ -15,10 +17,9 @@ public class Program
     {
         var builder = WebApplication.CreateBuilder(args);
 
-        // 1. Configuração de Autenticação JWT (Keycloak)
         builder.Services.AddAuthentication("Bearer").AddJwtBearer("Bearer", options =>
         {
-            options.Authority = "http://localhost:8080/realms/cashflow";
+            options.Authority = builder.Configuration["Keycloak:Authority"];
             options.RequireHttpsMetadata = false;
             options.TokenValidationParameters = new TokenValidationParameters
             {
@@ -26,13 +27,27 @@ public class Program
             };
         });
 
-        // 2. Injeção de Dependências (Infraestrutura e CQRS)
-        // Regista a ligação ao Redis como Singleton
-        builder.Services.AddSingleton<IConnectionMultiplexer>(sp => ConnectionMultiplexer.Connect("localhost:6379"));
+        var redisConnectionString = builder.Configuration.GetConnectionString("RedisConnection");
+        if (string.IsNullOrEmpty(redisConnectionString))
+        {
+            throw new ArgumentNullException(nameof(redisConnectionString), "A connection string do Redis não foi configurada.");
+        }
 
-        // Regista o repositório e o handler
+        builder.Services.AddSingleton<IConnectionMultiplexer>(sp =>
+            ConnectionMultiplexer.Connect(redisConnectionString));
+
+    
+        var mongoConnectionString = builder.Configuration.GetConnectionString("MongoDbConnection");
+        builder.Services.AddSingleton<IMongoClient>(sp => new MongoClient(mongoConnectionString));
+        builder.Services.AddScoped<IMongoDatabase>(sp =>
+        {
+            var client = sp.GetRequiredService<IMongoClient>();
+            var databaseName = builder.Configuration["MongoDb:DatabaseName"] ?? "CashFlowConsolidatedDb";
+            return client.GetDatabase(databaseName);
+        });
+
         builder.Services.AddScoped<IBalanceRepository, RedisBalanceRepository>();
-        builder.Services.AddScoped<GetBalanceQueryHandler>();
+        builder.Services.AddScoped<IGetBalanceQueryHandler, GetBalanceQueryHandler>();
 
         builder.Services.AddAuthorization();
         builder.Services.AddControllers();
