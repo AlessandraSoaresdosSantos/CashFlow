@@ -57,7 +57,7 @@ A solução é composta por 9 projetos, organizados de forma a respeitar a separ
 ┗ 📂 Validação (Testes)
   ┣ 🧪 CashFlow.UnitTests            -> Testes de Controllers, Handlers, Repositórios e Workers isolados.
   ┗ 🔗 CashFlow.IntegrationTests     -> Testes de integração (Ponta a Ponta) das APIs.
-
+```
 
 🛠️ Tecnologias Utilizadas
 Backend: C# com .NET 8 (Web API, Worker Services)
