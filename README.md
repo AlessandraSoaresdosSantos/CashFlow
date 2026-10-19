@@ -25,7 +25,7 @@ A modernização tecnológica foi desenhada em três estágios estratégicos par
 O repositório está organizado para separar a inteligência arquitetural (desenho) da implementação técnica (código):
 
 ### 1. `📁 documentacao/` (Desenho da Solução)
-Contém todos os artefactos de engenharia de software e visão de produto:
+Contêm todos os artefactos de engenharia de software e visão de produto:
 *   **ADR (Architecture Decision Record):** Documenta o contexto e os motivos das escolhas tecnológicas críticas (ex: porquê utilizar o Apache Kafka para orquestração de eventos e o Redis para leitura de saldos).
 *   **Diagramas de Soluções:** Representações visuais das soluções AS-IS, Tática e Target.
 
