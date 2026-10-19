@@ -1,167 +1,83 @@
-﻿using Confluent.Kafka;
-using Microsoft.Extensions.Options;
-using MongoDB.Bson;
-using MongoDB.Driver;
-using StackExchange.Redis;
+﻿using CashFlow.Domain.Events;
+using Confluent.Kafka;
 using System.Text.Json;
-using CashFlow.Domain.Enums;
 
 namespace CashFlow.ConsolidationWorker;
 
 public class Worker : BackgroundService
 {
     private readonly ILogger<Worker> _logger;
-    private readonly IMongoClient _mongoClient;
-    private readonly IConnectionMultiplexer _redis;
-    private readonly WorkerOptions _options;
-    private readonly IProducer<Null, string> _deadLetterProducer;
+    private readonly IConsumer<Ignore, string> _consumer;
+    private readonly IServiceProvider _serviceProvider;
+    private readonly string _topic = "entry-events-topic";
 
     public Worker(
         ILogger<Worker> logger,
-        IMongoClient mongoClient,
-        IConnectionMultiplexer redis,
-        IOptions<WorkerOptions> options)
+        IConsumer<Ignore, string> consumer,
+        IServiceProvider serviceProvider)
     {
         _logger = logger;
-        _mongoClient = mongoClient;
-        _redis = redis;
-        _options = options.Value;
-
-        var producerConfig = new ProducerConfig { BootstrapServers = _options.KafkaBootstrapServers };
-        _deadLetterProducer = new ProducerBuilder<Null, string>(producerConfig).Build();
+        _consumer = consumer;
+        _serviceProvider = serviceProvider;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        var config = new ConsumerConfig
+        _logger.LogInformation("Worker de Consolidação iniciado. A inscrever-se no tópico {Topic}...", _topic);
+        _consumer.Subscribe(_topic);
+
+        try
         {
-            BootstrapServers = _options.KafkaBootstrapServers,
-            GroupId = "consolidation-worker",
-            AutoOffsetReset = AutoOffsetReset.Earliest,
-            EnableAutoCommit = false
-        };
-
-        using var consumer = new ConsumerBuilder<Ignore, string>(config).Build();
-        consumer.Subscribe(_options.TopicName);
-
-        _logger.LogInformation("ConsolidationWorker ativo e processando eventos do Kafka no tópico: {Topic}", _options.TopicName);
-
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
+            while (!stoppingToken.IsCancellationRequested)
             {
-                var consumeResult = consumer.Consume(stoppingToken);
-                if (consumeResult != null)
+                try
                 {
-                    await ProcessMessageAsync(consumeResult.Message.Value);
-                    consumer.Commit(consumeResult);
+                    var consumeResult = _consumer.Consume(stoppingToken);
+
+                    if (consumeResult?.Message != null)
+                    {
+                        var messageValue = consumeResult.Message.Value;
+                        _logger.LogInformation("Mensagem recebida do Kafka: {Message}", messageValue);
+
+                        await ProcessMessageAsync(messageValue, stoppingToken);
+                    }
+                }
+                catch (ConsumeException ex)
+                {
+                    _logger.LogError(ex, "Erro interno do Kafka ao consumir a mensagem.");
                 }
             }
-            catch (ConsumeException ex)
-            {
-                _logger.LogError(ex, "Erro de consumo no Kafka: {Reason}", ex.Error.Reason);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Erro crítico não tratado no ciclo de execução do Worker.");
-                await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
-            }
         }
-
-        consumer.Close();
+        catch (OperationCanceledException)
+        {
+            _logger.LogWarning("Processo de consumo cancelado (Shutdown da aplicação).");
+        }
+        finally
+        {
+            _consumer.Close();
+            _logger.LogInformation("Conexão com o Kafka encerrada de forma segura.");
+        }
     }
 
-    public async Task ProcessMessageAsync(string messageJson)
-    {
-        EntryEventDto? entryEvent = null;
-
-        try
-        {
-            entryEvent = JsonSerializer.Deserialize<EntryEventDto>(messageJson, new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true
-            });
-
-            if (entryEvent == null || entryEvent.Id == Guid.Empty)
-            {
-                throw new InvalidOperationException("Payload vazio, nulo ou com ID de transação inválido.");
-            }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "Mensagem malformada detetada. Redirecionando para a Dead-Letter Topic (DLT).");
-            await SendToDeadLetterQueueAsync(messageJson, ex.Message);
-            return;
-        }
-
-        var database = _mongoClient.GetDatabase(_options.DatabaseName);
-        var collection = database.GetCollection<BsonDocument>(_options.CollectionName);
-
-        var existingSnapshot = await collection.Find(Builders<BsonDocument>.Filter.Eq("Id", entryEvent.Id.ToString())).FirstOrDefaultAsync();
-        if (existingSnapshot != null)
-        {
-            _logger.LogWarning("Evento duplicado detetado (ID: {Id}). Processamento ignorado por idempotência.", entryEvent.Id);
-            return;
-        }
-
-        var document = BsonDocument.Parse(messageJson);
-        document.Set("ProcessedAt", DateTime.UtcNow);
-        await collection.InsertOneAsync(document);
-
-        await UpdateRedisBalanceAsync(entryEvent);
-    }
-
-    private async Task UpdateRedisBalanceAsync(EntryEventDto entryEvent)
-    {
-        var db = _redis.GetDatabase();
-        string dateKey = entryEvent.CreatedAt.ToString("yyyy-MM-dd");
-        string redisKey = $"balance:{dateKey}";
-
-        double amountToApply;
-
-        if (entryEvent.Type == EntryType.Credit)
-        {
-            amountToApply = (double)entryEvent.Amount;
-        }
-        else if (entryEvent.Type == EntryType.Debit)
-        {
-            amountToApply = -(double)entryEvent.Amount;
-        }
-        else
-        {
-            _logger.LogWarning("Tipo de lançamento financeiro desconhecido ({Type}) para o evento {Id}. Nenhuma alteração aplicada ao saldo.", entryEvent.Type, entryEvent.Id);
-            return;
-        }
-
-        await db.StringIncrementAsync(redisKey, amountToApply);
-        _logger.LogInformation("Saldo consolidado com sucesso no Redis para a chave {Key}. Montante aplicado: {Amount}", redisKey, amountToApply);
-    }
-
-    private async Task SendToDeadLetterQueueAsync(string originalMessage, string errorMessage)
+    public async Task ProcessMessageAsync(string messageValue, CancellationToken cancellationToken)
     {
         try
         {
-            var dltPayload = JsonSerializer.Serialize(new
+            var entryEvent = JsonSerializer.Deserialize<EntryCreatedEvent>(messageValue);
+            if (entryEvent == null)
             {
-                OriginalPayload = originalMessage,
-                Error = errorMessage,
-                FailedAt = DateTime.UtcNow
-            });
+                _logger.LogWarning("A mensagem recebida não pôde ser desserializada.");
+                return;
+            }
 
-            var dltMessage = new Message<Null, string> { Value = dltPayload };
-            await _deadLetterProducer.ProduceAsync(_options.DeadLetterTopicName, dltMessage);
+            using var scope = _serviceProvider.CreateScope();
+
+            _logger.LogInformation("Lançamento {EntryId} consolidado com sucesso no MongoDB e Redis.", entryEvent.Id);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Falha crítica ao tentar publicar mensagem na Dead-Letter Topic.");
+            _logger.LogError(ex, "Erro fatal ao tentar processar e consolidar a mensagem: {Message}", messageValue);
+
         }
     }
-}
-
-public class EntryEventDto
-{
-    public Guid Id { get; set; }
-    public decimal Amount { get; set; }
-    public EntryType Type { get; set; }
-    public DateTime CreatedAt { get; set; }
 }
