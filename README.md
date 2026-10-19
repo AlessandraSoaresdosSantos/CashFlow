@@ -6,7 +6,7 @@
 
 Este repositório centraliza toda a engenharia, documentação arquitetural e o código-fonte do sistema **CashFlow**, projetado para modernizar e escalar a gestão financeira diária das operações de uma empresa. 
 
-A solução visa proporcionar um controlo absoluto e em tempo real sobre as entradas e saídas, substituindo o esforço manual e sistemas legados por um ecossistema tecnológico distribuído, resiliente e de alta performance.
+A solução visa proporcionar um controle absoluto e em tempo real sobre as entradas e saídas, substituindo o esforço manual e sistemas legados por um ecossistema tecnológico distribuído, resiliente e de alta performance.
 
 ---
 
@@ -14,7 +14,7 @@ A solução visa proporcionar um controlo absoluto e em tempo real sobre as entr
 
 A modernização tecnológica foi desenhada em três estágios estratégicos para garantir entregas de valor contínuas sem paralisar o negócio:
 
-*   **Visão AS-IS (O Cenário Atual):** Representa o modelo tradicional de gestão. Operações baseadas em processos manuais, controlos fragmentados ou sistemas legados com alto nível de acoplamento. Neste cenário, a extração de métricas financeiras consolidadas é lenta, suscetível a erros humanos e incapaz de escalar de forma fluida com o aumento do volume de transações.
+*   **Visão AS-IS (O Cenário Atual):** Representa o modelo tradicional de gestão. Operações baseadas em processos manuais, controles fragmentados ou sistemas legados com alto nível de acoplamento. Neste cenário, a extração de métricas financeiras consolidadas é lenta, suscetível a erros humanos e incapaz de escalar de forma fluida com o aumento do volume de transações.
 *   **Visão TÁTICA (O MVP Escalável - *Foco deste Repositório*):** Resolve as dores imediatas do negócio utilizando padrões de arquitetura modernos (*CQRS*, *Event-Driven* com Apache Kafka, SQL Server, MongoDB e Redis). Segrega completamente o registo de novos lançamentos da consulta de saldos, entregando resiliência e tempos de resposta ultrarrápidos em O(1) para o dia a dia da operação.
 *   **Visão TARGET (O Alvo Definitivo):** O estado futuro ideal. Uma plataforma 100% *Cloud-Native* (SaaS), com malha de serviços (*Service Mesh*) avançada, *pipelines* de CI/CD totalmente automatizados, observabilidade preditiva e capacidade de integração automática com fornecedores e plataformas externas em múltiplas regiões.
 
@@ -26,11 +26,11 @@ O repositório está organizado para separar a inteligência arquitetural (desen
 
 ### 1. `📁 documentacao/` (Desenho da Solução)
 Contém todos os artefactos de engenharia de software e visão de produto:
-*   **ADRs (Architecture Decision Records):** Documentam o contexto e os motivos das escolhas tecnológicas críticas (ex: porquê utilizar o Apache Kafka para orquestração de eventos e o Redis para leitura de saldos).
-*   **Diagramas (C4 Model):** Representações visuais de Contexto, Contentores e Componentes de Infraestrutura.
+*   **ADR (Architecture Decision Record):** Documenta o contexto e os motivos das escolhas tecnológicas críticas (ex: porquê utilizar o Apache Kafka para orquestração de eventos e o Redis para leitura de saldos).
+*   **Diagramas de Soluções:** Representações visuais das soluções AS-IS, Tática e Target.
 
 ### 2. `📁 projeto/` (Código-Fonte e Execução)
-Contém a totalidade do código-fonte referente à **Visão Tática**. 
+Contêm a totalidade do código-fonte referente à **Visão Tática**. 
 A arquitetura é composta por um *API Gateway* (YARP), microsserviços segregados para Escrita (`EntryAPI`) e Leitura (`ConsolidationAPI`), e processamento assíncrono em *background* (`ConsolidationWorker`).
 
 > 🔗 **IMPORTANTE:** Para instruções detalhadas de como compilar, configurar a infraestrutura Docker, popular o banco de dados (*Database First*) e rodar a aplicação, **[consulte o README Técnico dentro da pasta do projeto](https://github.com/AlessandraSoaresdosSantos/CashFlow/blob/master/Projeto/README.md)**.
