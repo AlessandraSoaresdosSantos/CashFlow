@@ -15,10 +15,10 @@ Este repositório contém o código-fonte do **CashFlow**, uma solução de arqu
 
 - [x] **YARP API Gateway:** Roteamento centralizado na porta 5000 e Rate Limiting configurado.
 - [x] **EntryAPI:** Validação de regras de negócio, persistência ACID no SQL Server e emissão de eventos.
-- [x] **Mensageria (Kafka):** Fluxo de eventos assíncrono totalmente configurado e operacional via Docker.
-- [x] **Consolidation Worker:** Consumo em tempo real do Kafka, guardando histórico no MongoDB e saldo atualizado no Redis.
+- [x] **Mensageria (Kafka):** Fluxo de eventos assíncrono totalmente configurado (Produtor e Consumidor).
+- [x] **Consolidation Worker:** Consumo em tempo real do Kafka configurado via `BackgroundService`, guardando histórico no MongoDB e saldo no Redis.
 - [x] **ConsolidationAPI:** Consultas de saldo em O(1) direto do Redis, com rotina de *fallback* resiliente para o MongoDB.
-- [x] **Testes Automatizados:** Cobertura de testes unitários focada em Repositórios e Controllers (Mock de Redis e Mongo 100% verdes).
+- [x] **Testes Automatizados (100% Verdes):** Cobertura robusta contornando injeções de dependência, JWT Auth, conversões implícitas do StackExchange.Redis e Mock de loops infinitos do Worker.
 
 ---
 
@@ -56,7 +56,7 @@ A solução é composta por 9 projetos, organizados de forma a respeitar a separ
 ┃ ┗ 🚪 CashFlow.Gateway              -> API Gateway (YARP) que unifica as rotas.
 ┗ 📂 Validação (Testes)
   ┣ 🧪 CashFlow.UnitTests            -> Testes de Controllers, Handlers, Repositórios e Workers isolados.
-  ┗ 🔗 CashFlow.IntegrationTests     -> Testes de integração (Ponta a Ponta) das APIs.
+  ┗ 🔗 CashFlow.IntegrationTests     -> Testes de integração (Ponta a Ponta) das APIs contornando [Authorize].
 ```
 
 🛠️ Tecnologias Utilizadas
