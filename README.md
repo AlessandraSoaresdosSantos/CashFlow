@@ -33,8 +33,7 @@ Contém todos os artefactos de engenharia de software e visão de produto:
 Contém a totalidade do código-fonte referente à **Visão Tática**. 
 A arquitetura é composta por um *API Gateway* (YARP), microsserviços segregados para Escrita (`EntryAPI`) e Leitura (`ConsolidationAPI`), e processamento assíncrono em *background* (`ConsolidationWorker`).
 
-> 🔗 **IMPORTANTE:** Para instruções detalhadas de como compilar, configurar a infraestrutura Docker, popular o banco de dados (*Database First*) e rodar a aplicação, **[consulte o README Técnico dentro da pasta do projeto]([https://github.com/AlessandraSoaresdosSantos/CashFlow/blob/master/Projeto/README.md)]**.
-
+> 🔗 **IMPORTANTE:** Para instruções detalhadas de como compilar, configurar a infraestrutura Docker, popular o banco de dados (*Database First*) e rodar a aplicação, **[consulte o README Técnico dentro da pasta do projeto](https://github.com/AlessandraSoaresdosSantos/CashFlow/blob/master/Projeto/README.md)**.
 ---
 
 ## ✅ Status de Implementação (O que está pronto para avaliação?)
